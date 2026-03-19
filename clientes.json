@@ -1,0 +1,14 @@
+{
+  "sindico123": {
+    "nome_condominio": "Edifício Solar",
+    "logo": "logo_solar.png",
+    "plano": "Premium",
+    "ativo": true
+  },
+  "parceiro456": {
+    "nome_condominio": "Residencial Palmeiras",
+    "logo": "logo_palmeiras.png",
+    "plano": "Básico",
+    "ativo": true
+  }
+}
