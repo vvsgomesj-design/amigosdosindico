@@ -41,6 +41,19 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
             elementos.append(Paragraph(f"<b>Status:</b> {dados['status']}", estilo_st))
             if dados.get('obs'):
                 elementos.append(Paragraph(f"<b>Observações:</b> {dados['obs']}", estilos['Normal']))
+            
+            # Adicionar foto ao PDF se existir
+            if chave in fotos and fotos[chave]:
+                try:
+                    img_data = fotos[chave]
+                    if hasattr(img_data, 'getvalue'): img_data = img_data.getvalue()
+                    img_buffer = io.BytesIO(img_data)
+                    pil_img = PILImage.open(img_buffer)
+                    w, h = pil_img.size
+                    aspect = h / w
+                    elementos.append(RLImage(io.BytesIO(img_data), width=10*cm, height=10*cm*aspect))
+                except: pass
+                
             elementos.append(Spacer(1, 5))
             elementos.append(Paragraph("-" * 90, estilos['Normal']))
     
@@ -185,10 +198,10 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
-    # Categorias Personalizadas do 13 ao 17
+    # Personalizadas do 13 ao 17
     for i in range(13, 18):
         chave = f"{i}. Personalizada"
-        cats[chave] = {"emoji": "📝", "itens": [{"desc": f"Subcategoria {j+1}", "norma": ""} for j in range(10)], "custom": True}
+        cats[chave] = {"emoji": "📝", "itens": [{"desc": f"Subitem {j+1}", "norma": ""} for j in range(10)], "custom": True}
     st.session_state.categorias_dinamicas = cats
 
 # --- 4. INTERFACE ---
@@ -209,15 +222,15 @@ elif st.session_state.pagina == "menu":
     st.subheader(f"🏢 Vistoria: {st.session_state.nome_predio}")
     if st.button("📊 GERAR RELATÓRIO PDF", use_container_width=True):
         pdf = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
-        st.download_button("⬇️ Baixar PDF", data=pdf, file_name="Vistoria.pdf")
+        st.download_button("⬇️ Baixar PDF", data=pdf, file_name=f"Vistoria_{st.session_state.nome_predio}.pdf")
     
     st.write("---")
     cols = st.columns(2)
     for i, (chave, info) in enumerate(st.session_state.categorias_dinamicas.items()):
         with cols[i % 2]:
             if info.get("custom"):
-                nome_exib = st.text_input(f"Título da Categoria {chave.split('.')[0]}:", value=chave, key=f"in_{chave}")
-                if st.button(f"Abrir: {nome_exib}", key=f"btn_{chave}", use_container_width=True):
+                nome_exib = st.text_input(f"Editar Título {chave[:2]}:", value=chave, key=f"t_{chave}")
+                if st.button(f"Abrir: {nome_exib}", key=f"b_{chave}", use_container_width=True):
                     st.session_state.cat_ativa, st.session_state.cat_nome_atual = chave, nome_exib
                     st.session_state.pagina = "categoria"; st.rerun()
             else:
@@ -232,55 +245,41 @@ elif st.session_state.pagina == "categoria":
     st.title(st.session_state.cat_nome_atual)
 
     for idx, item_data in enumerate(info["itens"]):
-        chave_res = f"{cat_chave}_{idx}"
+        res_id = f"{cat_chave}_{idx}"
         
-        # Correção visual: pega apenas a descrição do texto
-        nome_item = st.text_input(f"Item {idx+1}:", value=item_data["desc"], key=f"nm_{chave_res}") if info.get("custom") else item_data["desc"]
+        # Correção Visual: Garantir que apenas o texto da descrição apareça
+        nome_item = st.text_input(f"Item {idx+1}:", value=item_data["desc"], key=f"in_{res_id}") if info.get("custom") else item_data["desc"]
         
         if not info.get("custom"):
             st.write(f"#### {idx+1}. {nome_item}")
-            if "norma" in item_data and item_data["norma"]:
-                st.caption(f"📜 {item_data['norma']} | {item_data.get('detalhe', '')}")
+            if "norma" in item_data: st.caption(f"📜 {item_data['norma']}")
 
-        if chave_res not in st.session_state.respostas:
-            st.session_state.respostas[chave_res] = {"status": "Pendente", "nome": nome_item, "obs": ""}
-        st.session_state.respostas[chave_res]["nome"] = nome_item
+        if res_id not in st.session_state.respostas:
+            st.session_state.respostas[res_id] = {"status": "Pendente", "nome": nome_item, "obs": ""}
+        st.session_state.respostas[res_id]["nome"] = nome_item
 
         c1, c2, c3 = st.columns([1, 1, 1.5])
-        status = st.session_state.respostas[chave_res]["status"]
+        status = st.session_state.respostas[res_id]["status"]
         cor_status = "#28a745" if status == "Conforme" else "#dc3545" if status == "Irregular" else "#6c757d"
 
         with c1:
-            if st.button("✅ CONFORME", key=f"v_{chave_res}", use_container_width=True):
-                st.session_state.respostas[chave_res]["status"] = "Conforme"; st.rerun()
+            if st.button("✅ CONFORME", key=f"ok_{res_id}", use_container_width=True):
+                st.session_state.respostas[res_id]["status"] = "Conforme"; st.rerun()
         with c2:
-            if st.button("❌ IRREGULAR", key=f"r_{chave_res}", use_container_width=True):
-                st.session_state.respostas[chave_res]["status"] = "Irregular"; st.rerun()
+            if st.button("❌ IRREGULAR", key=f"no_{res_id}", use_container_width=True):
+                st.session_state.respostas[res_id]["status"] = "Irregular"; st.rerun()
         with c3:
-            st.markdown(f'<div style="background-color:{cor_status};color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color:{cor_status};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
 
-        st.session_state.respostas[chave_res]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[chave_res]["obs"], key=f"o_{chave_res}")
-
- # Upload e Exibição da Foto
-            foto_upload = st.file_uploader("Anexar Foto", type=['jpg', 'png'], key=f"f_{chave}")
-            if foto_upload:
-                st.session_state.fotos[chave] = foto_upload.getvalue()
-                st.rerun()
-                
-            if chave in st.session_state.fotos:
-                st.image(st.session_state.fotos[chave], width=300, caption="Foto da Evidência")
-            st.markdown('</div>', unsafe_allow_html=True)
-# EXCLUSÃO SEGURA DE FOTO
-        if key in st.session_state.fotos:
-            st.image(st.session_state.fotos[key], width=200)
-            if st.button("🗑️ Excluir Foto", key=f"df_{key}"):
-                st.session_state.fotos.pop(key, None)
-                st.rerun()
-        else:
-            up = st.file_uploader("📸 Foto", type=['jpg','png'], key=f"up_{key}")
-            if up: 
-                st.session_state.fotos[key] = up
-                st.rerun()
-
-
+        # Notas e Fotos de forma limpa
+        st.session_state.respostas[res_id]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[res_id]["obs"], key=f"o_{res_id}", height=80)
+        
+        up = st.file_uploader("📸 Anexar Foto", type=['jpg','png','jpeg'], key=f"up_{res_id}")
+        if up: st.session_state.fotos[res_id] = up
+        
+        if res_id in st.session_state.fotos:
+            st.image(st.session_state.fotos[res_id], width=200)
+            if st.button("🗑️ Remover Foto", key=f"del_{res_id}"):
+                st.session_state.fotos.pop(res_id); st.rerun()
+        
         st.write("---")
