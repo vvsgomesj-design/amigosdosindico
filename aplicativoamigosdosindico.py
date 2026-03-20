@@ -4,7 +4,11 @@ import os
 import io
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
-# ... (restante das importações do reportlab permanecem iguais)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from PIL import Image as PILImage
 
 # --- 1. FUNÇÕES DE APOIO ---
 def carregar_clientes():
@@ -18,7 +22,27 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     estilos = getSampleStyleSheet()
     elementos = []
-    # ... (lógica do PDF permanece a mesma para garantir compatibilidade)
+    if os.path.exists('amigosdosindico.png'):
+        try:
+            logo = RLImage('amigosdosindico.png', width=4*cm, height=2*cm)
+            elementos.append(logo)
+        except: pass
+    elementos.append(Paragraph(f"Relatório de Vistoria: {nome_predio}", estilos['Title']))
+    elementos.append(Paragraph(f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilos['Normal']))
+    elementos.append(Spacer(1, 12))
+    
+    for chave, dados in respostas.items():
+        if dados['status'] != "Pendente":
+            cor = colors.green if dados['status'] == "Conforme" else colors.red
+            estilo_st = ParagraphStyle('st', parent=estilos['Normal'], textColor=cor, fontWeight='Bold')
+            elementos.append(Paragraph(f"<b>Item:</b> {dados['nome']}", estilos['Normal']))
+            elementos.append(Paragraph(f"<b>Status:</b> {dados['status']}", estilo_st))
+            if dados.get('obs'):
+                elementos.append(Paragraph(f"<b>Observações:</b> {dados['obs']}", estilos['Normal']))
+            elementos.append(Spacer(1, 5))
+            elementos.append(Paragraph("-" * 90, estilos['Normal']))
+    
+    doc.build(elementos)
     buffer.seek(0)
     return buffer
 
@@ -28,7 +52,7 @@ if 'respostas' not in st.session_state: st.session_state.respostas = {}
 if 'fotos' not in st.session_state: st.session_state.fotos = {}
 if 'pagina' not in st.session_state: st.session_state.pagina = "login"
 
-# --- 3. ESTRUTURA DE CATEGORIAS ---
+# --- 3. ESTRUTURA COMPLETA (01 A 17) ---
 if 'categorias_dinamicas' not in st.session_state:
     cats = {
         "01. Elétrica": {
@@ -159,27 +183,40 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
-    # Personalizadas começando do 13 ao 17
+    # Personalizadas do 13 ao 17
     for i in range(13, 18):
-        chave = f"{i}. Personalizada"
-        cats[chave] = {"emoji": "📝", "itens": [{"desc": f"Subcategoria {j+1}", "norma": ""} for j in range(10)], "custom": True}
+        chave_p = f"{i}. Personalizada"
+        cats[chave_p] = {"emoji": "📝", "itens": [f"Subitem {j+1}" for j in range(10)], "custom": True}
     st.session_state.categorias_dinamicas = cats
 
 # --- 4. INTERFACE ---
+if os.path.exists('amigosdosindico.png'):
+    st.image('amigosdosindico.png', width=200)
+
+dados_clientes = carregar_clientes()
+
 if st.session_state.pagina == "login":
-    # ... (lógica de login permanece igual)
-    pass
+    senha = st.text_input("Senha do Condomínio:", type="password")
+    if st.button("Entrar", use_container_width=True):
+        if senha in dados_clientes:
+            st.session_state.nome_predio = dados_clientes[senha]["nome_condominio"]
+            st.session_state.pagina = "menu"; st.rerun()
+        else: st.error("Senha incorreta.")
 
 elif st.session_state.pagina == "menu":
-    st.subheader(f"🏢 Vistoria: {st.session_state.nome_predio}")
-    # ... (botão de PDF)
+    st.subheader(f"🏢 Condomínio: {st.session_state.nome_predio}")
+    if st.button("📊 GERAR RELATÓRIO PDF", use_container_width=True):
+        pdf = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
+        st.download_button("⬇️ Baixar Relatório", data=pdf, file_name="Vistoria.pdf")
+    
+    st.write("---")
     cols = st.columns(2)
     for i, (chave, info) in enumerate(st.session_state.categorias_dinamicas.items()):
         with cols[i % 2]:
             if info.get("custom"):
-                nome_exib = st.text_input(f"Definir Categoria {chave.split('.')[0]}:", value=chave, key=f"in_{chave}")
-                if st.button(f"Abrir: {nome_exib}", key=f"btn_{chave}", use_container_width=True):
-                    st.session_state.cat_ativa, st.session_state.cat_nome_atual = chave, nome_exib
+                nome_edit = st.text_input(f"Editar Título {chave[:2]}:", value=chave, key=f"t_{chave}")
+                if st.button(f"Abrir: {nome_edit}", key=f"b_{chave}", use_container_width=True):
+                    st.session_state.cat_ativa, st.session_state.cat_nome_atual = chave, nome_edit
                     st.session_state.pagina = "categoria"; st.rerun()
             else:
                 if st.button(f"{info['emoji']} {chave}", use_container_width=True):
@@ -187,31 +224,34 @@ elif st.session_state.pagina == "menu":
                     st.session_state.pagina = "categoria"; st.rerun()
 
 elif st.session_state.pagina == "categoria":
-    cat_chave = st.session_state.cat_ativa
-    info = st.session_state.categorias_dinamicas[cat_chave]
-    if st.button("← Menu"): st.session_state.pagina = "menu"; st.rerun()
+    cat_id = st.session_state.cat_ativa
+    info = st.session_state.categorias_dinamicas[cat_id]
+    if st.button("← Voltar"): st.session_state.pagina = "menu"; st.rerun()
     st.title(st.session_state.cat_nome_atual)
 
-    for idx, item_data in enumerate(info["itens"]):
-        chave_res = f"{cat_chave}_{idx}"
-        nome_item = st.text_input(f"Item {idx+1}:", value=item_data["desc"], key=f"nm_{chave_res}") if info.get("custom") else item_data["desc"]
+    for idx, item_base in enumerate(info["itens"]):
+        res_id = f"{cat_id}_{idx}"
         
-        if not info.get("custom"): st.write(f"#### {idx+1}. {nome_item}")
+        # Campo de texto para subcategorias se for personalizada
+        nome_final = st.text_input(f"Nome do Item {idx+1}:", value=item_base, key=f"nm_{res_id}") if info.get("custom") else item_base
+        if not info.get("custom"): st.write(f"#### {idx+1}. {nome_final}")
 
-        if chave_res not in st.session_state.respostas:
-            st.session_state.respostas[chave_res] = {"status": "Pendente", "nome": nome_item, "obs": ""}
-        st.session_state.respostas[chave_res]["nome"] = nome_item
+        if res_id not in st.session_state.respostas:
+            st.session_state.respostas[res_id] = {"status": "Pendente", "nome": nome_final, "obs": ""}
+        st.session_state.respostas[res_id]["nome"] = nome_final
 
         c1, c2, c3 = st.columns([1, 1, 1.5])
-        status = st.session_state.respostas[chave_res]["status"]
+        status = st.session_state.respostas[res_id]["status"]
         cor_status = "#28a745" if status == "Conforme" else "#dc3545" if status == "Irregular" else "#6c757d"
 
         with c1:
-            if st.button("✅ CONFORME", key=f"v_{chave_res}", use_container_width=True):
-                st.session_state.respostas[chave_res]["status"] = "Conforme"; st.rerun()
+            if st.button("✅ CONFORME", key=f"ok_{res_id}", use_container_width=True):
+                st.session_state.respostas[res_id]["status"] = "Conforme"; st.rerun()
         with c2:
-            if st.button("❌ IRREGULAR", key=f"r_{chave_res}", use_container_width=True):
-                st.session_state.respostas[chave_res]["status"] = "Irregular"; st.rerun()
+            if st.button("❌ IRREGULAR", key=f"no_{res_id}", use_container_width=True):
+                st.session_state.respostas[res_id]["status"] = "Irregular"; st.rerun()
         with c3:
-            st.markdown(f'<div style="background-color:{cor_status};color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
-        # ... (campos de Notas e Foto permanecem iguais)
+            st.markdown(f'<div style="background-color:{cor_status};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
+
+        st.session_state.respostas[res_id]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[res_id]["obs"], key=f"o_{res_id}")
+        st.write("---")
