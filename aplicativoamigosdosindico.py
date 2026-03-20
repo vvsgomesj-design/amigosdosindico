@@ -8,7 +8,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-# Biblioteca para manipulação de imagem (necessária para redimensionar no PDF)
 from PIL import Image as PILImage
 
 # --- 1. FUNÇÃO PARA CARREGAR DADOS ---
@@ -26,9 +25,11 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
 
     # Adicionar Logo no PDF se existir
     if os.path.exists('amigosdosindico.png'):
-        logo_pdf = RLImage('amigosdosindico.png', width=4*cm, height=2*cm)
-        elementos.append(logo_pdf)
-        elementos.append(Spacer(1, 12))
+        try:
+            logo_pdf = RLImage('amigosdosindico.png', width=4*cm, height=2*cm)
+            elementos.append(logo_pdf)
+            elementos.append(Spacer(1, 12))
+        except: pass
 
     titulo = f"Relatório de Vistoria: {nome_predio}"
     elementos.append(Paragraph(titulo, estilos['Title']))
@@ -49,7 +50,6 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
             if chave in fotos:
                 try:
                     img_data = fotos[chave].getvalue()
-                    # Redimensionar a imagem mantendo a proporção para não estourar o PDF
                     pil_img = PILImage.open(io.BytesIO(img_data))
                     width, height = pil_img.size
                     aspect = height / width
@@ -59,8 +59,8 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
                     
                     img = RLImage(io.BytesIO(img_data), width=final_width, height=final_height)
                     elementos.append(img)
-                except Exception as e:
-                    elementos.append(Paragraph(f"<i>(Erro ao carregar foto: {e})</i>", estilos['Normal']))
+                except:
+                    elementos.append(Paragraph("<i>(Erro ao carregar foto)</i>", estilos['Normal']))
             
             elementos.append(Spacer(1, 10))
             elementos.append(Paragraph("-" * 90, estilos['Normal']))
@@ -79,7 +79,6 @@ if 'pagina' not in st.session_state: st.session_state.pagina = "login"
 
 # --- 4. CATEGORIAS (ESTRUTURA COMPLETA) ---
 if 'categorias_dinamicas' not in st.session_state:
-    # Exemplo com algumas categorias (adicione as outras conforme necessário)
     categorias = {
     "01. Elétrica": {
         "emoji": "⚡",
@@ -209,7 +208,6 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
-    # Acrescentar as 5 categorias personalizadas (10 itens cada)
     for i in range(1, 6):
         nome_chave = f"Personalizada {i}"
         categorias[nome_chave] = {"emoji": "📝", "itens": [{"desc": f"Item {j+1}"} for j in range(10)]}
@@ -234,30 +232,20 @@ if st.session_state.pagina == "login":
     with l2:
         st.subheader("🔑 Login do Condomínio")
         
-        # Imagem decorativa no login
-        if os.path.exists('prediovermelho.png'):
-            st.image('prediovermelho.png', width=100)
-            
+        # Entrada limpa (sem o prédio vermelho)
         senha = st.text_input("Digite a Senha do Prédio:", type="password")
         if st.button("Entrar", use_container_width=True):
             if senha in dados_clientes:
                 st.session_state.autenticado = True
                 st.session_state.nome_predio = dados_clientes[senha]["nome_condominio"]
                 st.session_state.pagina = "menu"
-                st.success(f"Bem-vindo, {st.session_state.nome_predio}!")
                 st.rerun()
             else:
                 st.error("Senha incorreta.")
     st.stop()
 
 elif st.session_state.pagina == "menu":
-    m1, m2 = st.columns([3, 1])
-    with m1:
-        st.subheader(f"🏢 Vistoria: {st.session_state.nome_predio}")
-    with m2:
-        # Imagem de sucesso/status verde
-        if os.path.exists('predioverde.png'):
-            st.image('predioverde.png', width=80)
+    st.subheader(f"🏢 Vistoria: {st.session_state.nome_predio}")
     
     st.divider()
     st.subheader("📄 Relatório Final")
@@ -279,7 +267,6 @@ elif st.session_state.pagina == "menu":
             cat_info = st.session_state.categorias_dinamicas[cat_id]
             label = f"{cat_info['emoji']} {cat_id}"
             
-            # Botão da categoria
             if st.button(label, use_container_width=True, key=f"btn_{cat_id}"):
                 st.session_state.cat_ativa = cat_id
                 st.session_state.pagina = "categoria"
@@ -301,27 +288,36 @@ elif st.session_state.pagina == "categoria":
 
     for i, item in enumerate(cat_info["itens"]):
         chave = f"{cat}_item_{i}"
-        # Inicializar resposta se não existir
         if chave not in st.session_state.respostas:
             st.session_state.respostas[chave] = {"status": "Pendente", "nome": item['desc'], "obs": ""}
 
         st.write(f"#### {i+1}. {st.session_state.respostas[chave]['nome']}")
         
-        col_v, col_r, col_status = st.columns([1, 1, 2])
+        # Layout dos Botões com Imagens
+        col_verde, col_vermelho, col_status = st.columns([1.2, 1.2, 2])
         status_atual = st.session_state.respostas[chave]["status"]
-        
-        # Cores do status
         cor_fundo = "#28a745" if status_atual == "Conforme" else "#dc3545" if status_atual == "Irregular" else "#6c757d"
 
-        with col_v:
-            if st.button("✅ OK", key=f"v_{chave}", use_container_width=True):
+        with col_verde:
+            # Botão CONFORME com prédio verde
+            if os.path.exists('predioverde.png'):
+                st.image('predioverde.png', width=50)
+            if st.button("✅ CONFORME", key=f"v_{chave}", use_container_width=True):
                 st.session_state.respostas[chave]["status"] = "Conforme"
                 st.rerun()
-        with col_r:
-            if st.button("❌ FALHA", key=f"r_{chave}", use_container_width=True):
+
+        with col_vermelho:
+            # Botão IRREGULAR com prédio vermelho
+            if os.path.exists('prediovermelho.png'):
+                st.image('prediovermelho.png', width=50)
+            if st.button("❌ IRREGULAR", key=f"r_{chave}", use_container_width=True):
                 st.session_state.respostas[chave]["status"] = "Irregular"
                 st.rerun()
+
         with col_status:
+            # Espaçador para alinhar o status com os botões
+            st.write("") 
+            st.write("")
             st.markdown(f'<div style="background-color:{cor_fundo};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;font-size:1.1em;">{status_atual.upper()}</div>', unsafe_allow_html=True)
 
         c_obs, c_foto = st.columns(2)
@@ -331,7 +327,6 @@ elif st.session_state.pagina == "categoria":
             foto_upload = st.file_uploader("📷 Adicionar Foto", type=['jpg','png','jpeg'], key=f"f_{chave}")
             if foto_upload:
                 st.session_state.fotos[chave] = foto_upload
-                # Mostrar miniatura da foto
                 st.image(foto_upload, width=150)
         
         st.write("---")
