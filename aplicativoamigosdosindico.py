@@ -10,7 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import cm
 from PIL import Image as PILImage
 
-# --- 1. FUNÇÃO PARA CARREGAR DADOS ---
+# --- 1. FUNÇÕES DE SUPORTE ---
 def carregar_clientes():
     if os.path.exists('clientes.json'):
         with open('clientes.json', 'r', encoding='utf-8') as f:
@@ -23,7 +23,6 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
     estilos = getSampleStyleSheet()
     elementos = []
 
-    # Adicionar Logo no PDF se existir
     if os.path.exists('amigosdosindico.png'):
         try:
             logo_pdf = RLImage('amigosdosindico.png', width=4*cm, height=2*cm)
@@ -40,28 +39,18 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
         if dados['status'] != "Pendente":
             cor_status = colors.green if dados['status'] == "Conforme" else colors.red
             estilo_status = ParagraphStyle('status', parent=estilos['Normal'], textColor=cor_status, fontWeight='Bold')
-            
             elementos.append(Paragraph(f"<b>Item:</b> {dados['nome']}", estilos['Normal']))
             elementos.append(Paragraph(f"<b>Status:</b> {dados['status']}", estilo_status))
-            
             if dados.get('obs'):
                 elementos.append(Paragraph(f"<b>Observações:</b> {dados['obs']}", estilos['Normal']))
-            
-            if chave in fotos:
+            if chave in fotos and fotos[chave] is not None:
                 try:
                     img_data = fotos[chave].getvalue()
                     pil_img = PILImage.open(io.BytesIO(img_data))
-                    width, height = pil_img.size
-                    aspect = height / width
-                    
-                    final_width = 8*cm
-                    final_height = final_width * aspect
-                    
-                    img = RLImage(io.BytesIO(img_data), width=final_width, height=final_height)
+                    w, h = pil_img.size
+                    img = RLImage(io.BytesIO(img_data), width=8*cm, height=(8*cm*h/w))
                     elementos.append(img)
-                except:
-                    elementos.append(Paragraph("<i>(Erro ao carregar foto)</i>", estilos['Normal']))
-            
+                except: pass
             elementos.append(Spacer(1, 10))
             elementos.append(Paragraph("-" * 90, estilos['Normal']))
 
@@ -69,15 +58,14 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
     buffer.seek(0)
     return buffer
 
-# --- 2. CONFIGURAÇÃO DA PÁGINA ---
+# --- 2. CONFIGURAÇÃO E ESTADOS ---
 st.set_page_config(page_title="Amigos do Síndico PRO", layout="wide")
 
-# --- 3. INICIALIZAÇÃO DE ESTADOS ---
 if 'respostas' not in st.session_state: st.session_state.respostas = {}
 if 'fotos' not in st.session_state: st.session_state.fotos = {}
 if 'pagina' not in st.session_state: st.session_state.pagina = "login"
 
-# --- 4. CATEGORIAS (ESTRUTURA COMPLETA) ---
+# --- 3. MONTAGEM DAS CATEGORIAS E SUBCATEGORIAS ---
 if 'categorias_dinamicas' not in st.session_state:
     categorias = {
     "01. Elétrica": {
@@ -208,125 +196,88 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
+    # Criando as 5 Personalizadas com 10 subcategorias (itens) cada
     for i in range(1, 6):
-        nome_chave = f"Personalizada {i}"
-        categorias[nome_chave] = {"emoji": "📝", "itens": [{"desc": f"Item {j+1}"} for j in range(10)]}
+        nome_p = f"Personalizada {i}"
+        categorias[nome_p] = {"emoji": "📝", "itens": [f"Subcategoria {j+1}" for j in range(10)]}
     st.session_state.categorias_dinamicas = categorias
 
-# --- 5. INTERFACE ---
-
-# Layout do Topo com Logo (Aparece em todas as páginas)
+# --- 4. INTERFACE ---
 t1, t2, t3 = st.columns([1, 2, 1])
 with t2:
     if os.path.exists('amigosdosindico.png'):
         st.image('amigosdosindico.png', use_container_width=True)
-    else:
-        st.title("🏢 Amigos do Síndico PRO")
 
-# Lógica de Páginas
 dados_clientes = carregar_clientes()
 
 if st.session_state.pagina == "login":
     st.markdown("---")
-    l1, l2, l3 = st.columns([1, 2, 1])
+    _, l2, _ = st.columns([1, 2, 1])
     with l2:
-        st.subheader("🔑 Login do Condomínio")
-        
-        # Entrada limpa (sem o prédio vermelho)
-        senha = st.text_input("Digite a Senha do Prédio:", type="password")
+        st.subheader("🔑 Login")
+        senha = st.text_input("Senha do Prédio:", type="password")
         if st.button("Entrar", use_container_width=True):
             if senha in dados_clientes:
-                st.session_state.autenticado = True
                 st.session_state.nome_predio = dados_clientes[senha]["nome_condominio"]
-                st.session_state.pagina = "menu"
-                st.rerun()
-            else:
-                st.error("Senha incorreta.")
+                st.session_state.pagina = "menu"; st.rerun()
+            else: st.error("Senha incorreta.")
     st.stop()
 
 elif st.session_state.pagina == "menu":
-    st.subheader(f"🏢 Vistoria: {st.session_state.nome_predio}")
-    
-    st.divider()
-    st.subheader("📄 Relatório Final")
-    if st.button("📊 Gerar PDF da Vistoria", use_container_width=True):
-        if not st.session_state.respostas:
-            st.warning("Inicie uma vistoria primeiro marcando itens.")
+    st.subheader(f"🏢 {st.session_state.nome_predio}")
+    if st.button("📊 GERAR RELATÓRIO PDF", use_container_width=True):
+        if not st.session_state.respostas: st.warning("Marque itens primeiro.")
         else:
-            with st.spinner("Gerando PDF..."):
-                pdf_arquivo = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
-                st.download_button("⬇️ Baixar PDF", data=pdf_arquivo, file_name=f"Relatorio_{st.session_state.nome_predio}.pdf", mime="application/pdf")
+            pdf = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
+            st.download_button("⬇️ Baixar PDF", data=pdf, file_name=f"Vistoria_{st.session_state.nome_predio}.pdf", mime="application/pdf")
 
     st.write("---")
-    st.write("### Escolha uma Categoria")
-    
-    # Grid de Categorias
     cols = st.columns(2)
-    for i, cat_id in enumerate(st.session_state.categorias_dinamicas.keys()):
+    for i, (id_cat, info) in enumerate(st.session_state.categorias_dinamicas.items()):
         with cols[i % 2]:
-            cat_info = st.session_state.categorias_dinamicas[cat_id]
-            label = f"{cat_info['emoji']} {cat_id}"
-            
-            if st.button(label, use_container_width=True, key=f"btn_{cat_id}"):
-                st.session_state.cat_ativa = cat_id
-                st.session_state.pagina = "categoria"
-                st.rerun()
+            if st.button(f"{info['emoji']} {id_cat}", use_container_width=True):
+                st.session_state.cat_ativa = id_cat
+                st.session_state.pagina = "categoria"; st.rerun()
 
 elif st.session_state.pagina == "categoria":
-    cat = st.session_state.cat_ativa
-    cat_info = st.session_state.categorias_dinamicas[cat]
+    cat_atual = st.session_state.cat_ativa
+    itens = st.session_state.categorias_dinamicas[cat_atual]["itens"]
     
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.title(f"{cat_info['emoji']} {cat}")
-    with c2:
-        if st.button("← Voltar", use_container_width=True):
-            st.session_state.pagina = "menu"
-            st.rerun()
+    col_v1, col_v2 = st.columns([3, 1])
+    with col_v1: st.title(f"Vistoria: {cat_atual}")
+    with col_v2: 
+        if st.button("← Menu", use_container_width=True):
+            st.session_state.pagina = "menu"; st.rerun()
 
-    st.write("---")
-
-    for i, item in enumerate(cat_info["itens"]):
-        chave = f"{cat}_item_{i}"
+    for idx, nome_item in enumerate(itens):
+        chave = f"{cat_atual}_{idx}"
         if chave not in st.session_state.respostas:
-            st.session_state.respostas[chave] = {"status": "Pendente", "nome": item['desc'], "obs": ""}
-
-        st.write(f"#### {i+1}. {st.session_state.respostas[chave]['nome']}")
+            st.session_state.respostas[chave] = {"status": "Pendente", "nome": nome_item, "obs": ""}
         
-        # Layout dos Botões com Imagens
-        col_verde, col_vermelho, col_status = st.columns([1.2, 1.2, 2])
-        status_atual = st.session_state.respostas[chave]["status"]
-        cor_fundo = "#28a745" if status_atual == "Conforme" else "#dc3545" if status_atual == "Irregular" else "#6c757d"
-
-        with col_verde:
-            # Botão CONFORME com prédio verde
-            if os.path.exists('predioverde.png'):
-                st.image('predioverde.png', width=250)
-            if st.button("✅ CONFORME", key=f"v_{chave}", use_container_width=True):
-                st.session_state.respostas[chave]["status"] = "Conforme"
-                st.rerun()
-
-        with col_vermelho:
-            # Botão IRREGULAR com prédio vermelho
-            if os.path.exists('prediovermelho.png'):
-                st.image('prediovermelho.png', width=250)
-            if st.button("❌ IRREGULAR", key=f"r_{chave}", use_container_width=True):
-                st.session_state.respostas[chave]["status"] = "Irregular"
-                st.rerun()
-
-        with col_status:
-            # Espaçador para alinhar o status com os botões
-            st.write("") 
-            st.write("")
-            st.markdown(f'<div style="background-color:{cor_fundo};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;font-size:1.1em;">{status_atual.upper()}</div>', unsafe_allow_html=True)
-
-        c_obs, c_foto = st.columns(2)
-        with c_obs:
-            st.session_state.respostas[chave]["obs"] = st.text_area("Observações:", value=st.session_state.respostas[chave]["obs"], key=f"t_{chave}", height=100)
-        with c_foto:
-            foto_upload = st.file_uploader("📷 Adicionar Foto", type=['jpg','png','jpeg'], key=f"f_{chave}")
-            if foto_upload:
-                st.session_state.fotos[chave] = foto_upload
-                st.image(foto_upload, width=150)
+        st.write(f"### {idx+1}. {nome_item}")
+        c1, c2, c3 = st.columns([1, 1, 1.5])
         
+        with c1:
+            if os.path.exists('predioverde.png'): st.image('predioverde.png', width=40)
+            if st.button("CONFORME", key=f"v_{chave}", use_container_width=True):
+                st.session_state.respostas[chave]["status"] = "Conforme"; st.rerun()
+        with c2:
+            if os.path.exists('prediovermelho.png'): st.image('prediovermelho.png', width=40)
+            if st.button("IRREGULAR", key=f"r_{chave}", use_container_width=True):
+                st.session_state.respostas[chave]["status"] = "Irregular"; st.rerun()
+        with c3:
+            status = st.session_state.respostas[chave]["status"]
+            cor = "#28a745" if status == "Conforme" else "#dc3545" if status == "Irregular" else "#6c757d"
+            st.markdown(f'<div style="background-color:{cor};color:white;padding:10px;text-align:center;border-radius:5px;">{status}</div>', unsafe_allow_html=True)
+
+        obs_col, foto_col = st.columns(2)
+        with obs_col:
+            st.session_state.respostas[chave]["obs"] = st.text_area("Observação:", value=st.session_state.respostas[chave]["obs"], key=f"obs_{chave}")
+        with foto_col:
+            foto = st.file_uploader("Foto:", type=['jpg','png','jpeg'], key=f"f_{chave}")
+            if foto: 
+                st.session_state.fotos[chave] = foto
+                st.image(foto, width=100)
+                if st.button("🗑️ Remover Foto", key=f"del_{chave}"):
+                    st.session_state.fotos[chave] = None; st.rerun()
         st.write("---")
