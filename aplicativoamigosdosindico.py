@@ -260,4 +260,27 @@ elif st.session_state.pagina == "categoria":
             st.markdown(f'<div style="background-color:{cor_status};color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
 
         st.session_state.respostas[chave_res]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[chave_res]["obs"], key=f"o_{chave_res}")
+
+ # Upload e Exibição da Foto
+            foto_upload = st.file_uploader("Anexar Foto", type=['jpg', 'png'], key=f"f_{chave}")
+            if foto_upload:
+                st.session_state.fotos[chave] = foto_upload.getvalue()
+                st.rerun()
+                
+            if chave in st.session_state.fotos:
+                st.image(st.session_state.fotos[chave], width=300, caption="Foto da Evidência")
+            st.markdown('</div>', unsafe_allow_html=True)
+# EXCLUSÃO SEGURA DE FOTO
+        if key in st.session_state.fotos:
+            st.image(st.session_state.fotos[key], width=200)
+            if st.button("🗑️ Excluir Foto", key=f"df_{key}"):
+                st.session_state.fotos.pop(key, None)
+                st.rerun()
+        else:
+            up = st.file_uploader("📸 Foto", type=['jpg','png'], key=f"up_{key}")
+            if up: 
+                st.session_state.fotos[key] = up
+                st.rerun()
+
+
         st.write("---")
