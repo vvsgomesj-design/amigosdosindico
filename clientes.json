@@ -10,10 +10,9 @@
     "logo": "logo_palmeiras.png",
     "plano": "Básico",
     "ativo": true
-  }
-}
-"renato": {
-    "nome_condominio": "Controle Administrivo",
+  },
+  "renato": {
+    "nome_condominio": "Controle Administrativo",
     "logo": "amigosdosindico.png",
     "plano": "Premium",
     "ativo": true
