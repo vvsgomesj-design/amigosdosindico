@@ -42,7 +42,7 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
             if dados.get('obs'):
                 elementos.append(Paragraph(f"<b>Observações:</b> {dados['obs']}", estilos['Normal']))
             
-            # Adicionar foto ao PDF se existir
+            # Adicionar foto ao PDF se existir (sem lixo de fotos excluídas)
             if chave in fotos and fotos[chave]:
                 try:
                     img_data = fotos[chave]
@@ -198,7 +198,7 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
-    # Personalizadas do 13 ao 17
+    # Categorias Personalizadas do 13 ao 17
     for i in range(13, 18):
         chave = f"{i}. Personalizada"
         cats[chave] = {"emoji": "📝", "itens": [{"desc": f"Subitem {j+1}", "norma": ""} for j in range(10)], "custom": True}
@@ -247,7 +247,7 @@ elif st.session_state.pagina == "categoria":
     for idx, item_data in enumerate(info["itens"]):
         res_id = f"{cat_chave}_{idx}"
         
-        # Correção Visual: Garantir que apenas o texto da descrição apareça
+        # Correção Visual: Exibir apenas a frase de descrição
         nome_item = st.text_input(f"Item {idx+1}:", value=item_data["desc"], key=f"in_{res_id}") if info.get("custom") else item_data["desc"]
         
         if not info.get("custom"):
@@ -263,22 +263,16 @@ elif st.session_state.pagina == "categoria":
         cor_status = "#28a745" if status == "Conforme" else "#dc3545" if status == "Irregular" else "#6c757d"
 
         with c1:
-                if st.button("✅ CONFORME", key=f"c_{chave}", use_container_width=True):
-                    st.session_state.respostas[chave]["status"] = "Conforme"
-                    st.rerun()
-                if os.path.exists("predioverde.png"): st.image("predioverde.png")
-            
+            if os.path.exists("predioverde.png"): st.image("predioverde.png", width=200)
+            if st.button("✅ CONFORME", key=f"ok_{res_id}", use_container_width=True):
+                st.session_state.respostas[res_id]["status"] = "Conforme"; st.rerun()
         with c2:
-                if st.button("❌ IRREGULAR", key=f"i_{chave}", use_container_width=True):
-                    st.session_state.respostas[chave]["status"] = "Irregular"
-                    st.rerun()
-                if os.path.exists("prediovermelho.png"): st.image("prediovermelho.png")
-
-
+            if os.path.exists("prediovermelho.png"): st.image("prediovermelho.png", width=200)
+            if st.button("❌ IRREGULAR", key=f"no_{res_id}", use_container_width=True):
+                st.session_state.respostas[res_id]["status"] = "Irregular"; st.rerun()
         with c3:
             st.markdown(f'<div style="background-color:{cor_status};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
 
-        # Notas e Fotos de forma limpa
         st.session_state.respostas[res_id]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[res_id]["obs"], key=f"o_{res_id}", height=80)
         
         up = st.file_uploader("📸 Anexar Foto", type=['jpg','png','jpeg'], key=f"up_{res_id}")
