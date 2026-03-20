@@ -263,11 +263,18 @@ elif st.session_state.pagina == "categoria":
         cor_status = "#28a745" if status == "Conforme" else "#dc3545" if status == "Irregular" else "#6c757d"
 
         with c1:
-            if st.button("✅ CONFORME", key=f"ok_{res_id}", use_container_width=True):
-                st.session_state.respostas[res_id]["status"] = "Conforme"; st.rerun()
+                if st.button("✅ CONFORME", key=f"c_{chave}", use_container_width=True):
+                    st.session_state.respostas[chave]["status"] = "Conforme"
+                    st.rerun()
+                if os.path.exists("predioverde.png"): st.image("predioverde.png", width= 250)
+            
         with c2:
-            if st.button("❌ IRREGULAR", key=f"no_{res_id}", use_container_width=True):
-                st.session_state.respostas[res_id]["status"] = "Irregular"; st.rerun()
+                if st.button("❌ IRREGULAR", key=f"i_{chave}", use_container_width=True):
+                    st.session_state.respostas[chave]["status"] = "Irregular"
+                    st.rerun()
+                if os.path.exists("prediovermelho.png"): st.image("prediovermelho.png", width= 250)
+
+
         with c3:
             st.markdown(f'<div style="background-color:{cor_status};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
 
