@@ -301,7 +301,7 @@ elif st.session_state.pagina == "categoria":
         with col_verde:
             # Botão CONFORME com prédio verde
             if os.path.exists('predioverde.png'):
-                st.image('predioverde.png', width=50)
+                st.image('predioverde.png', width=250)
             if st.button("✅ CONFORME", key=f"v_{chave}", use_container_width=True):
                 st.session_state.respostas[chave]["status"] = "Conforme"
                 st.rerun()
@@ -309,7 +309,7 @@ elif st.session_state.pagina == "categoria":
         with col_vermelho:
             # Botão IRREGULAR com prédio vermelho
             if os.path.exists('prediovermelho.png'):
-                st.image('prediovermelho.png', width=50)
+                st.image('prediovermelho.png', width=250)
             if st.button("❌ IRREGULAR", key=f"r_{chave}", use_container_width=True):
                 st.session_state.respostas[chave]["status"] = "Irregular"
                 st.rerun()
