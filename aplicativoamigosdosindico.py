@@ -59,7 +59,7 @@ if 'respostas' not in st.session_state: st.session_state.respostas = {}
 if 'fotos' not in st.session_state: st.session_state.fotos = {}
 if 'pagina' not in st.session_state: st.session_state.pagina = "login"
 
-# --- 3. ESTRUTURA (ELÉTRICA, HIDRÁULICA, INCÊNDIO + 5 PERSONALIZADAS) ---
+# --- 3. ESTRUTURA INICIAL ---
 if 'categorias_dinamicas' not in st.session_state:
     categorias = {
     "01. Elétrica": {
@@ -190,95 +190,98 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
-    # Criando 5 categorias com 10 subitens vazios cada
+    # Inicializa 5 categorias personalizadas vazias
     for i in range(1, 6):
-        categorias[f"Personalizada {i}"] = [f"Subcategoria {j+1}" for j in range(10)]
+        chave_p = f"Personalizada {i}"
+        categorias[chave_p] = {"emoji": "📝", "itens": [f"Item {j+1}" for j in range(10)], "editavel": True}
     st.session_state.categorias_dinamicas = categorias
 
 # --- 4. INTERFACE ---
-t1, t2, t3 = st.columns([1, 2, 1])
-with t2:
-    if os.path.exists('amigosdosindico.png'):
-        st.image('amigosdosindico.png', use_container_width=True)
+if os.path.exists('amigosdosindico.png'):
+    st.image('amigosdosindico.png', width=200)
 
 dados_clientes = carregar_clientes()
 
 if st.session_state.pagina == "login":
-    st.markdown("---")
-    _, l2, _ = st.columns([1, 2, 1])
-    with l2:
-        st.subheader("🔑 Acesso Restrito")
-        senha = st.text_input("Senha do Condomínio:", type="password")
-        if st.button("Entrar", use_container_width=True):
-            if senha in dados_clientes:
-                st.session_state.nome_predio = dados_clientes[senha]["nome_condominio"]
-                st.session_state.pagina = "menu"; st.rerun()
-            else: st.error("Senha incorreta.")
-    st.stop()
+    senha = st.text_input("Senha do Condomínio:", type="password")
+    if st.button("Entrar", use_container_width=True):
+        if senha in dados_clientes:
+            st.session_state.nome_predio = dados_clientes[senha]["nome_condominio"]
+            st.session_state.pagina = "menu"; st.rerun()
+        else: st.error("Senha incorreta.")
 
 elif st.session_state.pagina == "menu":
-    st.subheader(f"🏢 Vistoria: {st.session_state.nome_predio}")
+    st.subheader(f"🏢 {st.session_state.nome_predio}")
     if st.button("📊 GERAR RELATÓRIO PDF", use_container_width=True):
-        if not st.session_state.respostas: st.warning("Inicie a vistoria marcando os itens.")
-        else:
-            with st.spinner("Gerando PDF..."):
-                pdf = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
-                st.download_button("⬇️ Baixar Relatório", data=pdf, file_name=f"Vistoria_{st.session_state.nome_predio}.pdf")
+        pdf = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
+        st.download_button("⬇️ Baixar PDF", data=pdf, file_name="Vistoria.pdf")
     
     st.write("---")
-    st.write("### Selecione a Categoria")
+    st.write("### Categorias")
     cols = st.columns(2)
-    for i, nome_cat in enumerate(st.session_state.categorias_dinamicas.keys()):
+    for i, (nome_cat, info) in enumerate(st.session_state.categorias_dinamicas.items()):
         with cols[i % 2]:
-            if st.button(nome_cat, use_container_width=True):
-                st.session_state.cat_ativa = nome_cat; st.session_state.pagina = "categoria"; st.rerun()
+            # Se for personalizada, permite editar o nome da categoria no menu
+            if info.get("editavel"):
+                novo_nome = st.text_input(f"Nome da Categoria {i+1}:", value=nome_cat, key=f"edit_cat_{i}")
+                # Atualiza o nome se mudar
+                if st.button(f"Abrir: {novo_nome}", key=f"btn_{i}", use_container_width=True):
+                    st.session_state.cat_ativa = nome_cat # Mantém a chave original para os dados
+                    st.session_state.nome_exibicao_cat = novo_nome
+                    st.session_state.pagina = "categoria"; st.rerun()
+            else:
+                if st.button(f"{info['emoji']} {nome_cat}", use_container_width=True):
+                    st.session_state.cat_ativa = nome_cat
+                    st.session_state.nome_exibicao_cat = nome_cat
+                    st.session_state.pagina = "categoria"; st.rerun()
 
 elif st.session_state.pagina == "categoria":
-    cat = st.session_state.cat_ativa
-    c_voltar, c_titulo = st.columns([1, 4])
-    with c_voltar:
-        if st.button("← Menu"): st.session_state.pagina = "menu"; st.rerun()
-    with c_titulo: st.title(f"Categoria: {cat}")
+    cat_chave = st.session_state.cat_ativa
+    cat_nome = st.session_state.nome_exibicao_cat
+    info = st.session_state.categorias_dinamicas[cat_chave]
     
-    st.write("---")
+    if st.button("← Menu"): st.session_state.pagina = "menu"; st.rerun()
+    st.title(f"Vistoria: {cat_nome}")
     
-    for idx, item in enumerate(st.session_state.categorias_dinamicas[cat]):
-        chave = f"{cat}_{idx}"
-        if chave not in st.session_state.respostas:
-            st.session_state.respostas[chave] = {"status": "Pendente", "nome": item, "obs": ""}
+    for idx, item_padrao in enumerate(info["itens"]):
+        chave_res = f"{cat_chave}_{idx}"
         
-        st.write(f"#### {idx+1}. {item}")
+        # Se for editável, mostra caixa de texto para definir o nome da subcategoria
+        if info.get("editavel"):
+            nome_item = st.text_input(f"Nome do Item {idx+1}:", value=item_padrao, key=f"nm_{chave_res}")
+        else:
+            nome_item = item_padrao
+            st.write(f"#### {idx+1}. {nome_item}")
+
+        if chave_res not in st.session_state.respostas:
+            st.session_state.respostas[chave_res] = {"status": "Pendente", "nome": nome_item, "obs": ""}
         
-        # Botões com Prédios e Sinalização de Cores
+        # Atualiza o nome no relatório caso tenha sido editado
+        st.session_state.respostas[chave_res]["nome"] = nome_item
+
         col_v, col_r, col_status = st.columns([1, 1, 1.5])
-        status_atual = st.session_state.respostas[chave]["status"]
-        
-        # Definição das cores de sinalização
-        cor_sinalizacao = "#28a745" if status_atual == "Conforme" else "#dc3545" if status_atual == "Irregular" else "#6c757d"
+        status = st.session_state.respostas[chave_res]["status"]
+        cor = "#28a745" if status == "Conforme" else "#dc3545" if status == "Irregular" else "#6c757d"
 
         with col_v:
-            if os.path.exists('predioverde.png'): st.image('predioverde.png', width=45)
-            if st.button("CONFORME", key=f"btn_v_{chave}", use_container_width=True):
-                st.session_state.respostas[chave]["status"] = "Conforme"; st.rerun()
-        
+            if os.path.exists('predioverde.png'): st.image('predioverde.png', width=40)
+            if st.button("CONFORME", key=f"v_{chave_res}"):
+                st.session_state.respostas[chave_res]["status"] = "Conforme"; st.rerun()
         with col_r:
-            if os.path.exists('prediovermelho.png'): st.image('prediovermelho.png', width=45)
-            if st.button("IRREGULAR", key=f"btn_r_{chave}", use_container_width=True):
-                st.session_state.respostas[chave]["status"] = "Irregular"; st.rerun()
-        
+            if os.path.exists('prediovermelho.png'): st.image('prediovermelho.png', width=40)
+            if st.button("IRREGULAR", key=f"r_{chave_res}"):
+                st.session_state.respostas[chave_res]["status"] = "Irregular"; st.rerun()
         with col_status:
-            st.write("") # Espaçador
-            st.markdown(f'<div style="background-color:{cor_sinalizacao};color:white;padding:15px;text-align:center;border-radius:10px;font-weight:bold;font-size:1.2em;">{status_atual.upper()}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color:{cor};color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;">{status.upper()}</div>', unsafe_allow_html=True)
 
-        # Notas e Fotos
         o_col, f_col = st.columns(2)
         with o_col:
-            st.session_state.respostas[chave]["obs"] = st.text_area("Notas / Diagnóstico:", value=st.session_state.respostas[chave]["obs"], key=f"obs_{chave}", height=120)
+            st.session_state.respostas[chave_res]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[chave_res]["obs"], key=f"obs_{chave_res}")
         with f_col:
-            foto = st.file_uploader("📷 Tirar/Anexar Foto", type=['jpg','png','jpeg'], key=f"foto_{chave}")
+            foto = st.file_uploader("Foto:", type=['jpg','png','jpeg'], key=f"f_{chave_res}")
             if foto: 
-                st.session_state.fotos[chave] = foto
-                st.image(foto, width=150)
-                if st.button("🗑️ Remover Foto", key=f"del_{chave}"):
-                    st.session_state.fotos[chave] = None; st.rerun()
+                st.session_state.fotos[chave_res] = foto
+                st.image(foto, width=120)
+                if st.button("🗑️ Remover", key=f"del_{chave_res}"):
+                    st.session_state.fotos[chave_res] = None; st.rerun()
         st.write("---")
