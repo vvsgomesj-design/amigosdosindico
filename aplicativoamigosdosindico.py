@@ -235,10 +235,10 @@ elif st.session_state.pagina == "categoria":
         st.write(f"### {idx+1}. {nome_exibicao}")
         c1, c2, c3 = st.columns([1, 1, 1])
         with c1:
-            if os.path.exists('predioverde.png'): st.image('predioverde.png', width=40)
+            if os.path.exists('predioverde.png'): st.image('predioverde.png', width=250)
             if st.button("CONFORME", key=f"v_{chave}"): st.session_state.respostas[chave]["status"] = "Conforme"; st.rerun()
         with c2:
-            if os.path.exists('prediovermelho.png'): st.image('prediovermelho.png', width=40)
+            if os.path.exists('prediovermelho.png'): st.image('prediovermelho.png', width=250)
             if st.button("IRREGULAR", key=f"r_{chave}"): st.session_state.respostas[chave]["status"] = "Irregular"; st.rerun()
         with c3:
             st.info(st.session_state.respostas[chave]["status"])
