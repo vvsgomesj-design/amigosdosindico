@@ -22,7 +22,6 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
     estilos = getSampleStyleSheet()
     elementos = []
 
-    # Título do Relatório
     titulo = f"Relatório de Vistoria: {nome_predio}"
     elementos.append(Paragraph(titulo, estilos['Title']))
     elementos.append(Paragraph(f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilos['Normal']))
@@ -30,9 +29,8 @@ def gerar_pdf_vistoria(nome_predio, respostas, fotos):
 
     for chave, dados in respostas.items():
         if dados['status'] != "Pendente":
-            # Cabeçalho do Item
-            cor_texto = colors.green if dados['status'] == "Conforme" else colors.red
-            estilo_status = ParagraphStyle('item', parent=estilos['Normal'], textColor=cor_texto, fontWeight='Bold')
+            cor_status = colors.green if dados['status'] == "Conforme" else colors.red
+            estilo_status = ParagraphStyle('status', parent=estilos['Normal'], textColor=cor_status, fontWeight='Bold')
             
             elementos.append(Paragraph(f"<b>Item:</b> {dados['nome']}", estilos['Normal']))
             elementos.append(Paragraph(f"<b>Status:</b> {dados['status']}", estilo_status))
@@ -62,7 +60,8 @@ if 'pagina' not in st.session_state: st.session_state.pagina = "login"
 
 # --- 4. CATEGORIAS (ESTRUTURA COMPLETA) ---
 if 'categorias_dinamicas' not in st.session_state:
-   categorias = {
+    # Exemplo com algumas categorias (adicione as outras conforme necessário)
+    categorias = {
     "01. Elétrica": {
         "emoji": "⚡",
         "itens": [
@@ -191,12 +190,11 @@ if 'categorias_dinamicas' not in st.session_state:
         ]
     }
 }
-    # Acrescentar as 5 categorias personalizadas
-categorias = {} # Substitua por seu dicionário completo
-for i in range(1, 6):
+    # Acrescentar as 5 categorias personalizadas (10 itens cada)
+    for i in range(1, 6):
         nome_chave = f"Personalizada {i}"
         categorias[nome_chave] = {"emoji": "📝", "itens": [{"desc": f"Item {j+1}"} for j in range(10)]}
-        st.session_state.categorias_dinamicas = categorias
+    st.session_state.categorias_dinamicas = categorias
 
 # --- 5. LOGIN ---
 dados_clientes = carregar_clientes()
@@ -207,74 +205,52 @@ if "autenticado" not in st.session_state:
         if senha in dados_clientes:
             st.session_state.autenticado = True
             st.session_state.nome_predio = dados_clientes[senha]["nome_condominio"]
-            # --- 6. INTERFACE ---
+            st.session_state.pagina = "menu"
+            st.rerun()
+    st.stop()
+
 # --- 6. INTERFACE ---
 if st.session_state.pagina == "menu":
     st.subheader(f"🏢 {st.session_state.nome_predio}")
     
-    st.divider() # Linha 196 corrigida aqui
-    st.subheader("📄 Finalizar Vistoria")
-    
-    if st.button("📊 Gerar Relatório PDF", use_container_width=True):
+    st.divider()
+    st.subheader("📄 Relatório Final")
+    if st.button("📊 Gerar PDF da Vistoria", use_container_width=True):
         if not st.session_state.respostas:
-            st.warning("Realize ao menos uma vistoria antes de gerar o relatório.")
+            st.warning("Inicie uma vistoria primeiro.")
         else:
-            pdf = gerar_pdf_vistoria(
-                st.session_state.nome_predio, 
-                st.session_state.respostas, 
-                st.session_state.fotos
-            )
-            
-            st.download_button(
-                label="⬇️ Baixar Relatório PDF",
-                data=pdf,
-                file_name=f"Vistoria_{st.session_state.nome_predio}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )    
+            pdf_arquivo = gerar_pdf_vistoria(st.session_state.nome_predio, st.session_state.respostas, st.session_state.fotos)
+            st.download_button("⬇️ Baixar PDF", data=pdf_arquivo, file_name="Relatorio_Vistoria.pdf", mime="application/pdf")
 
-    # Exibição das categorias em grade
+    st.write("### Categorias")
     cols = st.columns(2)
     for i, cat_id in enumerate(st.session_state.categorias_dinamicas.keys()):
         with cols[i % 2]:
-            if "Personalizada" in cat_id:
-                label_atual = st.session_state.get(f"nome_real_{cat_id}", cat_id)
-                novo_nome = st.text_input(f"Editar nome da {cat_id}:", value=label_atual, key=f"edit_{cat_id}")
-                st.session_state[f"nome_real_{cat_id}"] = novo_nome
-                btn_txt = f"📝 {novo_nome}"
-            else:
-                btn_txt = f"{st.session_state.categorias_dinamicas[cat_id]['emoji']} {cat_id}"
-
-            if st.button(btn_txt, use_container_width=True, key=f"btn_{cat_id}"):
+            label = st.session_state.get(f"nome_real_{cat_id}", cat_id)
+            if st.button(label, use_container_width=True, key=f"btn_{cat_id}"):
                 st.session_state.cat_ativa = cat_id
                 st.session_state.pagina = "categoria"
                 st.rerun()
 
 elif st.session_state.pagina == "categoria":
     cat = st.session_state.cat_ativa
-    nome_exibicao = st.session_state.get(f"nome_real_{cat}", cat)
-    st.title(f"Vistoria: {nome_exibicao}")
-    
-    if st.button("← Voltar"):
-        st.session_state.pagina = "menu"; st.rerun()
+    st.title(f"Vistoria: {cat}")
+    if st.button("← Voltar ao Menu"):
+        st.session_state.pagina = "menu"
+        st.rerun()
 
     for i, item in enumerate(st.session_state.categorias_dinamicas[cat]["itens"]):
         chave = f"{cat}_item_{i}"
-        
         if chave not in st.session_state.respostas:
-            st.session_state.respostas[chave] = {"status": "Pendente", "obs": "", "nome": item['desc']}
+            st.session_state.respostas[chave] = {"status": "Pendente", "nome": item['desc'], "obs": ""}
 
         st.write(f"---")
-        if "Personalizada" in cat:
-            nome_sub = st.text_input(f"Nome do Item {i+1}:", value=st.session_state.respostas[chave]["nome"], key=f"input_{chave}")
-            st.session_state.respostas[chave]["nome"] = nome_sub
-        else:
-            st.write(f"### {st.session_state.respostas[chave]['nome']}")
+        st.write(f"### {st.session_state.respostas[chave]['nome']}")
         
+        col_v, col_r, col_status = st.columns([1, 1, 2])
         status_atual = st.session_state.respostas[chave]["status"]
         cor_fundo = "#28a745" if status_atual == "Conforme" else "#dc3545" if status_atual == "Irregular" else "#6c757d"
 
-        col_v, col_r, col_status = st.columns([1, 1, 2])
         with col_v:
             if st.button("✅ CONFORME", key=f"v_{chave}", use_container_width=True):
                 st.session_state.respostas[chave]["status"] = "Conforme"; st.rerun()
@@ -282,14 +258,13 @@ elif st.session_state.pagina == "categoria":
             if st.button("❌ IRREGULAR", key=f"r_{chave}", use_container_width=True):
                 st.session_state.respostas[chave]["status"] = "Irregular"; st.rerun()
         with col_status:
-            st.markdown(f'<div style="background-color:{cor_fundo};color:white;padding:30px;text-align:center;border-radius:10px;font-weight:bold;">{status_atual.upper()}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color:{cor_fundo};color:white;padding:15px;text-align:center;border-radius:10px;font-weight:bold;">{status_atual.upper()}</div>', unsafe_allow_html=True)
 
         c_obs, c_foto = st.columns(2)
         with c_obs:
-            obs_v = st.session_state.respostas[chave].get("obs", "")
-            st.session_state.respostas[chave]["obs"] = st.text_area("Notas:", value=obs_v, key=f"txt_{chave}")
+            st.session_state.respostas[chave]["obs"] = st.text_area("Notas:", value=st.session_state.respostas[chave]["obs"], key=f"t_{chave}")
         with c_foto:
-            arq = st.file_uploader("Anexar Foto", type=['jpg','png','jpeg'], key=f"up_{chave}")
-            if arq:
-                st.session_state.fotos[chave] = arq
-                st.image(arq, width=150)
+            foto_upload = st.file_uploader("📷 Foto", type=['jpg','png','jpeg'], key=f"f_{chave}")
+            if foto_upload:
+                st.session_state.fotos[chave] = foto_upload
+                st.image(foto_upload, width=150)
