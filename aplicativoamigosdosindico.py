@@ -266,13 +266,13 @@ elif st.session_state.pagina == "categoria":
                 if st.button("✅ CONFORME", key=f"c_{chave}", use_container_width=True):
                     st.session_state.respostas[chave]["status"] = "Conforme"
                     st.rerun()
-                if os.path.exists("predioverde.png"): st.image("predioverde.png", width= 250)
+                if os.path.exists("predioverde.png"): st.image("predioverde.png")
             
         with c2:
                 if st.button("❌ IRREGULAR", key=f"i_{chave}", use_container_width=True):
                     st.session_state.respostas[chave]["status"] = "Irregular"
                     st.rerun()
-                if os.path.exists("prediovermelho.png"): st.image("prediovermelho.png", width= 250)
+                if os.path.exists("prediovermelho.png"): st.image("prediovermelho.png")
 
 
         with c3:
